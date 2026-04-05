@@ -1,0 +1,55 @@
+name: Build AuthHashCalc
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+env:
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      - name: Build AuthHashCalc x86
+        working-directory: ./Source
+        run: msbuild AuthHashCalc.sln /m /p:Platform=x86 /p:Configuration=${{ env.BUILD_CONFIGURATION }} /p:PlatformToolset=v143
+
+      - name: Build AuthHashCalc x64
+        working-directory: ./Source
+        run: msbuild AuthHashCalc.sln /m /p:Platform=x64 /p:Configuration=${{ env.BUILD_CONFIGURATION }} /p:PlatformToolset=v143
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path Package\Application | Out-Null
+
+          $x86Exe = "Source\output\Win32\${{ env.BUILD_CONFIGURATION }}\ahc32.exe"
+          $x64Exe = "Source\output\x64\${{ env.BUILD_CONFIGURATION }}\ahc64.exe"
+
+          if (!(Test-Path $x86Exe)) {
+            throw "ahc32.exe not found at $x86Exe"
+          }
+
+          if (!(Test-Path $x64Exe)) {
+            throw "ahc64.exe not found at $x64Exe"
+          }
+
+          Copy-Item $x86Exe "Package\Application\ahc32.exe" -Force
+          Copy-Item $x64Exe "Package\Application\ahc64.exe" -Force
+
+      - name: Upload AuthHashCalc snapshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: authhashcalc_snapshot.zip
+          path: Package\Application\*
